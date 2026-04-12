@@ -1,45 +1,16 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
+const { chromium } = require('playwright');
+const path = require('path');
 
 const MAX_JOB_TEXT_LENGTH = 4000;
+const PROFILE_PATH = path.join(__dirname, '../../linkedin-profile');
 
-async function scrapeJob(url) {
-  const { data: html } = await axios.get(url, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    },
-    timeout: 10000,
-  });
+function extractJobId(url) {
+  const match = url.match(/currentJobId=(\d+)|jobs\/view\/(\d+)/);
+  return match ? (match[1] || match[2]) : null;
+}
 
-  const $ = cheerio.load(html);
-
-  // Remove non-content elements
-  $('script, style, nav, header, footer, iframe, img, svg').remove();
-
-  // Try common job description containers first
-  const selectors = [
-    '[class*="job-description"]',
-    '[class*="jobDescription"]',
-    '[class*="description"]',
-    '[id*="job-description"]',
-    'article',
-    'main',
-  ];
-
-  let text = '';
-  for (const selector of selectors) {
-    const el = $(selector).first();
-    if (el.length) {
-      text = el.text();
-      break;
-    }
-  }
-
-  // Fallback to body text
-  if (!text) text = $('body').text();
-
-  return cleanText(text).slice(0, MAX_JOB_TEXT_LENGTH);
+function buildJobUrl(jobId) {
+  return `https://www.linkedin.com/jobs/view/${jobId}/`;
 }
 
 function cleanText(text) {
@@ -48,6 +19,126 @@ function cleanText(text) {
     .replace(/[ ]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+async function scrapeJob(url) {
+  const context = await chromium.launchPersistentContext(PROFILE_PATH, {
+    headless: true,
+  });
+
+  const page = await context.newPage();
+
+  try {
+    console.log("Scraping:", url);
+
+    const jobId = extractJobId(url);
+    if (!jobId) throw new Error("Could not extract LinkedIn job ID");
+
+    const jobUrl = buildJobUrl(jobId);
+    console.log("Normalized job URL:", jobUrl);
+
+    await page.goto(jobUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+
+    await page.waitForTimeout(2000);
+
+    // -----------------------------
+    // LOGIN CHECK
+    // -----------------------------
+    const isBlocked = await page.evaluate(() => {
+      const text = document.body.innerText.toLowerCase();
+
+      return (
+        (text.includes('sign in') && text.includes('linkedin')) ||
+        window.location.href.includes('login') ||
+        window.location.href.includes('authwall') ||
+        window.location.href.includes('checkpoint')
+      );
+    });
+
+    if (isBlocked) {
+      throw new Error('LinkedIn login required or session expired');
+    }
+
+    // -----------------------------
+    // EXPAND "SEE MORE"
+    // -----------------------------
+    await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll('button')];
+
+      buttons.forEach(b => {
+        const t = (b.innerText || '').toLowerCase();
+        if (t.includes('see more') || t.includes('show more')) {
+          b.click();
+        }
+      });
+    });
+
+    await page.waitForTimeout(1500);
+
+    // -----------------------------
+    // SCROLL TO FORCE RENDER
+    // -----------------------------
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+    await page.waitForTimeout(1500);
+
+    // =====================================================
+    // 🚀 FIX #1: JSON-BASED EXTRACTION (MOST IMPORTANT)
+    // =====================================================
+    const text = await page.evaluate(() => {
+      // Try structured LinkedIn JSON first
+      const ldJson = document.querySelector('script[type="application/ld+json"]');
+
+      if (ldJson) {
+        try {
+          const data = JSON.parse(ldJson.innerText);
+          if (data && data.description) {
+            return data.description;
+          }
+        } catch (e) {}
+      }
+
+      // Try embedded page state (backup)
+      const scripts = Array.from(document.querySelectorAll('script'));
+      for (const s of scripts) {
+        const t = s.textContent || '';
+        if (t.includes('"description"') && t.includes('jobPosting')) {
+          const match = t.match(/"description":"([\s\S]*?)"/);
+          if (match && match[1]) {
+            return match[1]
+              .replace(/\\n/g, '\n')
+              .replace(/\\"/g, '"');
+          }
+        }
+      }
+
+      // =====================================================
+      // FIX #2: DOM FALLBACK (ONLY IF JSON FAILS)
+      // =====================================================
+      const el =
+        document.querySelector('span[data-testid="expandable-text-box"]') ||
+        document.querySelector('div.jobs-box__html-content') ||
+        document.querySelector('div.jobs-description__content') ||
+        document.querySelector('article');
+
+      if (el && el.textContent) {
+        return el.textContent;
+      }
+
+      return document.body.textContent;
+    });
+
+    return cleanText(text).slice(0, MAX_JOB_TEXT_LENGTH);
+
+  } catch (err) {
+    console.error("SCRAPER ERROR:", err.message);
+    throw err;
+  } finally {
+    await context.close();
+  }
 }
 
 module.exports = { scrapeJob };

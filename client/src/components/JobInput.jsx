@@ -16,7 +16,11 @@ export default function JobInput({ onJobDescription }) {
       setText(jobText);
       onJobDescription(jobText);
     } catch (err) {
-      setError('Failed to scrape URL. Paste the job description manually below.');
+        const message =
+    err?.response?.data?.error ||
+    'Failed to scrape URL. Paste the job description manually below.';
+
+  setError(message);
     } finally {
       setScraping(false);
     }
