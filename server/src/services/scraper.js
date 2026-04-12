@@ -44,9 +44,6 @@ async function scrapeJob(url) {
 
     await page.waitForTimeout(2000);
 
-    // -----------------------------
-    // LOGIN CHECK
-    // -----------------------------
     const isBlocked = await page.evaluate(() => {
       const text = document.body.innerText.toLowerCase();
 
@@ -62,9 +59,6 @@ async function scrapeJob(url) {
       throw new Error('LinkedIn login required or session expired');
     }
 
-    // -----------------------------
-    // EXPAND "SEE MORE"
-    // -----------------------------
     await page.evaluate(() => {
       const buttons = [...document.querySelectorAll('button')];
 
@@ -78,16 +72,10 @@ async function scrapeJob(url) {
 
     await page.waitForTimeout(1500);
 
-    // -----------------------------
-    // SCROLL TO FORCE RENDER
-    // -----------------------------
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
     await page.waitForTimeout(1500);
 
-    // =====================================================
-    // 🚀 FIX #1: JSON-BASED EXTRACTION (MOST IMPORTANT)
-    // =====================================================
     const text = await page.evaluate(() => {
       // Try structured LinkedIn JSON first
       const ldJson = document.querySelector('script[type="application/ld+json"]');
@@ -115,9 +103,6 @@ async function scrapeJob(url) {
         }
       }
 
-      // =====================================================
-      // FIX #2: DOM FALLBACK (ONLY IF JSON FAILS)
-      // =====================================================
       const el =
         document.querySelector('span[data-testid="expandable-text-box"]') ||
         document.querySelector('div.jobs-box__html-content') ||
