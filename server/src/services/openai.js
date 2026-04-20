@@ -5,6 +5,28 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MAX_RESUME_LENGTH = 4000;
 const MAX_JOB_LENGTH = 3000;
 
+function parseJsonSafely(rawContent) {
+  if (!rawContent) return {};
+
+  try {
+    return JSON.parse(rawContent);
+  } catch (initialError) {
+    const firstBrace = rawContent.indexOf('{');
+    const lastBrace = rawContent.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+      throw initialError;
+    }
+
+    const candidate = rawContent.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch (secondError) {
+      const withoutTrailingCommas = candidate.replace(/,\s*([}\]])/g, '$1');
+      return JSON.parse(withoutTrailingCommas);
+    }
+  }
+}
+
 async function tailorResumeAndGenerateQuestions(resumeText, jobDescription) {
   console.log('=== tailorResumeAndGenerateQuestions CALLED ===');
   console.log('Resume length:', resumeText?.length);
@@ -85,13 +107,19 @@ ${trimmedResume}`,
         },
       ],
       temperature: 0.4,
-      max_tokens: 2300,
+      max_tokens: 3200,
     });
 
     console.log('OpenAI response received');
+    const finishReason = response.choices?.[0]?.finish_reason;
+    if (finishReason === 'length') {
+      throw new Error(
+        'Model output was truncated before completion. Please retry; if this persists, shorten resume/job description input.'
+      );
+    }
 
     const content = response.choices?.[0]?.message?.content?.trim();
-    const parsed = JSON.parse(content || '{}');
+    const parsed = parseJsonSafely(content || '{}');
 
     const tailoredResume = (parsed.tailoredResume || '').trim();
     const changeReasons = Array.isArray(parsed.changeReasons)
