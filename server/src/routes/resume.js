@@ -47,6 +47,8 @@ router.post('/tailor', async (req, res) => {
       technicalQuestions,
       behavioralAnswers,
       technicalAnswers,
+      skillsExperienceLookFors,
+      projectIdeas,
     } =
       await tailorResumeAndGenerateQuestions(resumeText, jobDescription);
     const diff = generateDiff(resumeText, tailoredResume);
@@ -63,6 +65,10 @@ router.post('/tailor', async (req, res) => {
           question,
           answer: technicalAnswers[idx] || '',
         })),
+      },
+      jobFitInsights: {
+        skillsExperienceLookFors,
+        projectIdeas,
       },
     });
   } catch (err) {
