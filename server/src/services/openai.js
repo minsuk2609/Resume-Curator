@@ -65,6 +65,7 @@ STRICT RULES:
 - KEEP the exact same structure and order
 - KEEP formatting simple plain text
 - DO NOT add explanations or commentary
+- DO NOT simplify project and experience too much
 
 JOB DESCRIPTION:
 ${trimmedJob}
