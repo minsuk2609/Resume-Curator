@@ -43,6 +43,7 @@ router.post('/tailor', async (req, res) => {
   try {
     const {
       tailoredResume,
+      changeReasons,
       behavioralQuestions,
       technicalQuestions,
       behavioralAnswers,
@@ -56,6 +57,7 @@ router.post('/tailor', async (req, res) => {
       original: resumeText,
       tailored: tailoredResume,
       diff,
+      changeReasons,
       interviewQuestions: {
         behavioral: behavioralQuestions.map((question, idx) => ({
           question,
