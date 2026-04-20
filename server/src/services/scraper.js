@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 
 const MAX_JOB_TEXT_LENGTH = 4000;
-const PROFILE_PATH = path.join(__dirname, '../../linkedin-profile');
+const PROFILE_PATH = path.resolve(__dirname, '../../..', 'linkedin-profile');
 
 function extractJobId(url) {
   const match = url.match(/currentJobId=(\d+)|jobs\/view\/(\d+)/);
