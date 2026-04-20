@@ -3,7 +3,7 @@ const OpenAI = require('openai');
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const MAX_RESUME_LENGTH = 4000;
-const MAX_JOB_LENGTH = 3000;
+const MAX_JOB_LENGTH = 10000;
 
 function parseJsonSafely(rawContent) {
   if (!rawContent) return {};

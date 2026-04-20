@@ -4,7 +4,7 @@ const {
   hasLinkedInStorageState,
 } = require('./linkedinAuth');
 
-const MAX_JOB_TEXT_LENGTH = 4000;
+const MAX_JOB_TEXT_LENGTH = 10000;
 
 function extractJobId(url) {
   const match = url.match(/currentJobId=(\d+)|jobs\/view\/(\d+)/);
