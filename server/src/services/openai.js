@@ -45,6 +45,16 @@ Requirements:
 - Generate 5-8 technical questions tied to job requirements and candidate background.
 - Questions should be clear, specific, and interview-ready.
 
+STRICT RULES:
+- DO NOT add new sections (no Summary, Additional Information, etc.)
+- DO NOT change section titles
+- DO NOT invent experience, skills, or achievements
+- ONLY rewrite existing bullet points to better match the job description
+- ONLY inject relevant keywords from the job description into existing content
+- KEEP the exact same structure and order
+- KEEP formatting simple plain text
+- DO NOT add explanations or commentary
+
 JOB DESCRIPTION:
 ${trimmedJob}
 
