@@ -92,7 +92,9 @@ export default function App() {
 
             <div style={styles.tabContent}>
               {activeTab === 'tailored' && <TailoredResume text={result.tailored} />}
-              {activeTab === 'diff' && <DiffView diff={result.diff} />}
+              {activeTab === 'diff' && (
+                <DiffView diff={result.diff} changeReasons={result.changeReasons} />
+              )}
               {activeTab === 'questions' && (
                 <InterviewQuestions interviewQuestions={result.interviewQuestions} />
               )}

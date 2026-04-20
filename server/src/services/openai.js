@@ -37,6 +37,13 @@ async function tailorResumeAndGenerateQuestions(resumeText, jobDescription) {
 Return this JSON shape exactly:
 {
   "tailoredResume": "string",
+  "changeReasons": [
+    {
+      "originalText": "string",
+      "updatedText": "string",
+      "reason": "string"
+    }
+  ],
   "behavioralQuestions": ["string", "..."],
   "technicalQuestions": ["string", "..."],
   "behavioralAnswers": ["string", "..."],
@@ -55,6 +62,9 @@ Requirements:
 - Generate 5-8 concise bullets for skillsExperienceLookFors based on role expectations.
 - Generate 4-6 concise bullets for projectIdeas tailored to this role and candidate context.
 - Keep look-fors and project ideas specific, realistic, and action-oriented.
+- Include 5-12 itemized changeReasons entries, each tied to a specific resume edit.
+- For each changeReasons entry, keep originalText and updatedText short exact snippets from the resume.
+- reason must explain why that exact change improves fit for the job description.
 
 STRICT RULES:
 - DO NOT add new sections (no Summary, Additional Information, etc.)
@@ -83,6 +93,15 @@ ${trimmedResume}`,
     const parsed = JSON.parse(content || '{}');
 
     const tailoredResume = (parsed.tailoredResume || '').trim();
+    const changeReasons = Array.isArray(parsed.changeReasons)
+      ? parsed.changeReasons
+          .map((item) => ({
+            originalText: (item?.originalText || '').trim(),
+            updatedText: (item?.updatedText || '').trim(),
+            reason: (item?.reason || '').trim(),
+          }))
+          .filter((item) => item.originalText && item.updatedText && item.reason)
+      : [];
     const behavioralQuestions = Array.isArray(parsed.behavioralQuestions)
       ? parsed.behavioralQuestions.filter(Boolean)
       : [];
@@ -107,6 +126,7 @@ ${trimmedResume}`,
     }
 
     console.log('Tailored length:', tailoredResume.length);
+    console.log('Change reasons:', changeReasons.length);
     console.log('Behavioral questions:', behavioralQuestions.length);
     console.log('Technical questions:', technicalQuestions.length);
     console.log('Behavioral answers:', behavioralAnswers.length);
@@ -116,6 +136,7 @@ ${trimmedResume}`,
 
     return {
       tailoredResume,
+      changeReasons,
       behavioralQuestions,
       technicalQuestions,
       behavioralAnswers,
