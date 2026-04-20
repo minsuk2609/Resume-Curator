@@ -31,6 +31,8 @@ async function tailorResumeAndGenerateQuestions(resumeText, jobDescription) {
 1) A tailored resume.
 2) Behavioral interview questions and concise high-quality sample answers.
 3) Technical interview questions and concise high-quality sample answers.
+4) A short list of likely skills/experience areas this job posting is looking for.
+5) Practical project ideas that could strengthen this candidate's resume for this job.
 
 Return this JSON shape exactly:
 {
@@ -38,7 +40,9 @@ Return this JSON shape exactly:
   "behavioralQuestions": ["string", "..."],
   "technicalQuestions": ["string", "..."],
   "behavioralAnswers": ["string", "..."],
-  "technicalAnswers": ["string", "..."]
+  "technicalAnswers": ["string", "..."],
+  "skillsExperienceLookFors": ["string", "..."],
+  "projectIdeas": ["string", "..."]
 }
 
 Requirements:
@@ -48,6 +52,9 @@ Requirements:
 - Provide one answer for each question in the same order.
 - Keep each answer to 2-4 sentences with concrete details from the resume/job description.
 - Questions should be clear, specific, and interview-ready.
+- Generate 5-8 concise bullets for skillsExperienceLookFors based on role expectations.
+- Generate 4-6 concise bullets for projectIdeas tailored to this role and candidate context.
+- Keep look-fors and project ideas specific, realistic, and action-oriented.
 
 STRICT RULES:
 - DO NOT add new sections (no Summary, Additional Information, etc.)
@@ -88,6 +95,12 @@ ${trimmedResume}`,
     const technicalAnswers = Array.isArray(parsed.technicalAnswers)
       ? parsed.technicalAnswers.filter(Boolean)
       : [];
+    const skillsExperienceLookFors = Array.isArray(parsed.skillsExperienceLookFors)
+      ? parsed.skillsExperienceLookFors.filter(Boolean)
+      : [];
+    const projectIdeas = Array.isArray(parsed.projectIdeas)
+      ? parsed.projectIdeas.filter(Boolean)
+      : [];
 
     if (!tailoredResume) {
       throw new Error('Model did not return a tailored resume.');
@@ -98,6 +111,8 @@ ${trimmedResume}`,
     console.log('Technical questions:', technicalQuestions.length);
     console.log('Behavioral answers:', behavioralAnswers.length);
     console.log('Technical answers:', technicalAnswers.length);
+    console.log('Skills/experience look-fors:', skillsExperienceLookFors.length);
+    console.log('Project ideas:', projectIdeas.length);
 
     return {
       tailoredResume,
@@ -105,6 +120,8 @@ ${trimmedResume}`,
       technicalQuestions,
       behavioralAnswers,
       technicalAnswers,
+      skillsExperienceLookFors,
+      projectIdeas,
     };
   } catch (err) {
     console.error('OPENAI ERROR:', err);

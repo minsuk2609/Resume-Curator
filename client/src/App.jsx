@@ -4,6 +4,7 @@ import ResumeUpload from './components/ResumeUpload';
 import TailoredResume from './components/TailoredResume';
 import DiffView from './components/DiffView';
 import InterviewQuestions from './components/InterviewQuestions';
+import JobFitInsights from './components/JobFitInsights';
 import { tailorResume } from './api/client';
 
 export default function App() {
@@ -81,6 +82,12 @@ export default function App() {
               >
                 Interview Questions
               </button>
+              <button
+                style={{ ...styles.tab, ...(activeTab === 'insights' ? styles.tabActive : {}) }}
+                onClick={() => setActiveTab('insights')}
+              >
+                Job Fit Insights
+              </button>
             </div>
 
             <div style={styles.tabContent}>
@@ -88,6 +95,9 @@ export default function App() {
               {activeTab === 'diff' && <DiffView diff={result.diff} />}
               {activeTab === 'questions' && (
                 <InterviewQuestions interviewQuestions={result.interviewQuestions} />
+              )}
+              {activeTab === 'insights' && (
+                <JobFitInsights jobFitInsights={result.jobFitInsights} />
               )}
             </div>
           </div>
