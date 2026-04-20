@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "🔒 Running pre-push safety checks..."
+echo "Running pre-push safety checks"
 
 # Clean local auth/session artifacts that should never be pushed.
 SESSION_PATTERNS=(
@@ -19,13 +19,13 @@ removed_any=false
 for pattern in "${SESSION_PATTERNS[@]}"; do
   while IFS= read -r -d '' match; do
     rm -f "$match"
-    echo "🧹 Removed local session artifact: ${match#./}"
+    echo "Removed local session artifact: ${match#./}"
     removed_any=true
   done < <(find . -type f -name "$pattern" -not -path "*/node_modules/*" -not -path "*/.git/*" -print0)
 done
 
 if [ "$removed_any" = false ]; then
-  echo "✅ No local session artifacts found."
+  echo "No local session artifacts found."
 fi
 
 # Ensure sensitive local-only files are not tracked.
@@ -37,7 +37,7 @@ TRACKING_BLOCKLIST=(
 tracking_error=false
 for path in "${TRACKING_BLOCKLIST[@]}"; do
   if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
-    echo "❌ Sensitive file is tracked by git: $path"
+    echo "Sensitive file is tracked by git: $path"
     tracking_error=true
   fi
 done
@@ -52,17 +52,17 @@ secret_hits="$(git grep -nI -E "$SECRET_REGEX" -- \
   ':(exclude)server/package-lock.json' || true)"
 
 if [ -n "$secret_hits" ]; then
-  echo "❌ Possible secrets found in tracked files:"
+  echo "Possible secrets found in tracked files:"
   echo "$secret_hits"
   printf "\nReview and remove/redact before pushing.\n"
   tracking_error=true
 else
-  echo "✅ No obvious committed secrets found in tracked files."
+  echo "No obvious committed secrets found in tracked files."
 fi
 
 if [ "$tracking_error" = true ]; then
-  printf "\n🚫 Pre-push safety check failed.\n"
+  printf "\nPre-push safety check failed.\n"
   exit 1
 fi
 
-printf "\n✅ Pre-push safety check passed. Safe to push.\n"
+printf "\nPre-push safety check passed. Safe to push.\n"
