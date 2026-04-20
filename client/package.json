@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prepush:safety": "bash ../scripts/pre-push-safety.sh"
   },
   "dependencies": {
     "axios": "^1.7.2",
