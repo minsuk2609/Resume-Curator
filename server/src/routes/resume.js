@@ -41,7 +41,13 @@ router.post('/tailor', async (req, res) => {
   }
 
   try {
-    const { tailoredResume, behavioralQuestions, technicalQuestions } =
+    const {
+      tailoredResume,
+      behavioralQuestions,
+      technicalQuestions,
+      behavioralAnswers,
+      technicalAnswers,
+    } =
       await tailorResumeAndGenerateQuestions(resumeText, jobDescription);
     const diff = generateDiff(resumeText, tailoredResume);
     res.json({
@@ -49,8 +55,14 @@ router.post('/tailor', async (req, res) => {
       tailored: tailoredResume,
       diff,
       interviewQuestions: {
-        behavioral: behavioralQuestions,
-        technical: technicalQuestions,
+        behavioral: behavioralQuestions.map((question, idx) => ({
+          question,
+          answer: behavioralAnswers[idx] || '',
+        })),
+        technical: technicalQuestions.map((question, idx) => ({
+          question,
+          answer: technicalAnswers[idx] || '',
+        })),
       },
     });
   } catch (err) {

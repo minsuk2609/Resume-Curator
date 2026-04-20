@@ -29,20 +29,24 @@ async function tailorResumeAndGenerateQuestions(resumeText, jobDescription) {
           role: 'user',
           content: `Use the job description and resume to create:
 1) A tailored resume.
-2) Behavioral interview questions.
-3) Technical interview questions.
+2) Behavioral interview questions and concise high-quality sample answers.
+3) Technical interview questions and concise high-quality sample answers.
 
 Return this JSON shape exactly:
 {
   "tailoredResume": "string",
   "behavioralQuestions": ["string", "..."],
-  "technicalQuestions": ["string", "..."]
+  "technicalQuestions": ["string", "..."],
+  "behavioralAnswers": ["string", "..."],
+  "technicalAnswers": ["string", "..."]
 }
 
 Requirements:
 - Tailored resume should keep core facts truthful.
 - Generate 5-8 behavioral questions tied to role responsibilities and resume experiences.
 - Generate 5-8 technical questions tied to job requirements and candidate background.
+- Provide one answer for each question in the same order.
+- Keep each answer to 2-4 sentences with concrete details from the resume/job description.
 - Questions should be clear, specific, and interview-ready.
 
 STRICT RULES:
@@ -78,6 +82,12 @@ ${trimmedResume}`,
     const technicalQuestions = Array.isArray(parsed.technicalQuestions)
       ? parsed.technicalQuestions.filter(Boolean)
       : [];
+    const behavioralAnswers = Array.isArray(parsed.behavioralAnswers)
+      ? parsed.behavioralAnswers.filter(Boolean)
+      : [];
+    const technicalAnswers = Array.isArray(parsed.technicalAnswers)
+      ? parsed.technicalAnswers.filter(Boolean)
+      : [];
 
     if (!tailoredResume) {
       throw new Error('Model did not return a tailored resume.');
@@ -86,8 +96,16 @@ ${trimmedResume}`,
     console.log('Tailored length:', tailoredResume.length);
     console.log('Behavioral questions:', behavioralQuestions.length);
     console.log('Technical questions:', technicalQuestions.length);
+    console.log('Behavioral answers:', behavioralAnswers.length);
+    console.log('Technical answers:', technicalAnswers.length);
 
-    return { tailoredResume, behavioralQuestions, technicalQuestions };
+    return {
+      tailoredResume,
+      behavioralQuestions,
+      technicalQuestions,
+      behavioralAnswers,
+      technicalAnswers,
+    };
   } catch (err) {
     console.error('OPENAI ERROR:', err);
     throw err;
