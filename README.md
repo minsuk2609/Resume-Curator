@@ -60,7 +60,3 @@ Run this before `git push` to remove local auth/session artifacts and detect lik
 ```bash
 npm run prepush:safety
 ```
-
-### Is this client-side only?
-
-No. This is a **repository-level** safety script and is intended to protect the entire repo (client + server) before pushing.
