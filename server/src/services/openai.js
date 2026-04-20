@@ -28,6 +28,16 @@ async function tailorResume(resumeText, jobDescription) {
           role: 'user',
           content: `Rewrite and tailor this resume to match the job description below.
 
+STRICT RULES:
+- DO NOT add new sections (no Summary, Additional Information, etc.)
+- DO NOT change section titles
+- DO NOT invent experience, skills, or achievements
+- ONLY rewrite existing bullet points to better match the job description
+- ONLY inject relevant keywords from the job description into existing content
+- KEEP the exact same structure and order
+- KEEP formatting simple plain text
+- DO NOT add explanations or commentary
+
 JOB DESCRIPTION:
 ${trimmedJob}
 

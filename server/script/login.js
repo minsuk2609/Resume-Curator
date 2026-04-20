@@ -1,7 +1,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 
-const PROFILE_PATH = path.join(__dirname, '../../linkedin-profile');
+const PROFILE_PATH = path.resolve(__dirname, '../..', 'linkedin-profile');
 
 (async () => {
   const context = await chromium.launchPersistentContext(PROFILE_PATH, {
