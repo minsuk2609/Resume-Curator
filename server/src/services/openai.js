@@ -5,6 +5,28 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MAX_RESUME_LENGTH = 4000;
 const MAX_JOB_LENGTH = 3000;
 
+function parseJsonSafely(rawContent) {
+  if (!rawContent) return {};
+
+  try {
+    return JSON.parse(rawContent);
+  } catch (initialError) {
+    const firstBrace = rawContent.indexOf('{');
+    const lastBrace = rawContent.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+      throw initialError;
+    }
+
+    const candidate = rawContent.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch (secondError) {
+      const withoutTrailingCommas = candidate.replace(/,\s*([}\]])/g, '$1');
+      return JSON.parse(withoutTrailingCommas);
+    }
+  }
+}
+
 async function tailorResumeAndGenerateQuestions(resumeText, jobDescription) {
   console.log('=== tailorResumeAndGenerateQuestions CALLED ===');
   console.log('Resume length:', resumeText?.length);
@@ -37,6 +59,13 @@ async function tailorResumeAndGenerateQuestions(resumeText, jobDescription) {
 Return this JSON shape exactly:
 {
   "tailoredResume": "string",
+  "changeReasons": [
+    {
+      "originalText": "string",
+      "updatedText": "string",
+      "reason": "string"
+    }
+  ],
   "behavioralQuestions": ["string", "..."],
   "technicalQuestions": ["string", "..."],
   "behavioralAnswers": ["string", "..."],
@@ -55,6 +84,9 @@ Requirements:
 - Generate 5-8 concise bullets for skillsExperienceLookFors based on role expectations.
 - Generate 4-6 concise bullets for projectIdeas tailored to this role and candidate context.
 - Keep look-fors and project ideas specific, realistic, and action-oriented.
+- Include 5-12 itemized changeReasons entries, each tied to a specific resume edit.
+- For each changeReasons entry, keep originalText and updatedText short exact snippets from the resume.
+- reason must explain why that exact change improves fit for the job description.
 
 STRICT RULES:
 - DO NOT add new sections (no Summary, Additional Information, etc.)
@@ -74,15 +106,30 @@ ${trimmedResume}`,
         },
       ],
       temperature: 0.4,
-      max_tokens: 2300,
+      max_tokens: 3200,
     });
 
     console.log('OpenAI response received');
+    const finishReason = response.choices?.[0]?.finish_reason;
+    if (finishReason === 'length') {
+      throw new Error(
+        'Model output was truncated before completion. Please retry; if this persists, shorten resume/job description input.'
+      );
+    }
 
     const content = response.choices?.[0]?.message?.content?.trim();
-    const parsed = JSON.parse(content || '{}');
+    const parsed = parseJsonSafely(content || '{}');
 
     const tailoredResume = (parsed.tailoredResume || '').trim();
+    const changeReasons = Array.isArray(parsed.changeReasons)
+      ? parsed.changeReasons
+          .map((item) => ({
+            originalText: (item?.originalText || '').trim(),
+            updatedText: (item?.updatedText || '').trim(),
+            reason: (item?.reason || '').trim(),
+          }))
+          .filter((item) => item.originalText && item.updatedText && item.reason)
+      : [];
     const behavioralQuestions = Array.isArray(parsed.behavioralQuestions)
       ? parsed.behavioralQuestions.filter(Boolean)
       : [];
@@ -107,6 +154,7 @@ ${trimmedResume}`,
     }
 
     console.log('Tailored length:', tailoredResume.length);
+    console.log('Change reasons:', changeReasons.length);
     console.log('Behavioral questions:', behavioralQuestions.length);
     console.log('Technical questions:', technicalQuestions.length);
     console.log('Behavioral answers:', behavioralAnswers.length);
@@ -116,6 +164,7 @@ ${trimmedResume}`,
 
     return {
       tailoredResume,
+      changeReasons,
       behavioralQuestions,
       technicalQuestions,
       behavioralAnswers,
