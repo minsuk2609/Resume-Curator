@@ -1,24 +1,26 @@
 const { chromium } = require('playwright');
+const fs = require('fs');
 const path = require('path');
-
-const PROFILE_PATH = path.resolve(__dirname, '../..', 'linkedin-profile');
+const { getLinkedInStorageStatePath } = require('../src/services/linkedinAuth');
 
 (async () => {
-  const context = await chromium.launchPersistentContext(PROFILE_PATH, {
-    headless: false,
-  });
+  const storageStatePath = getLinkedInStorageStatePath();
+  fs.mkdirSync(path.dirname(storageStatePath), { recursive: true });
 
+  const browser = await chromium.launch({ headless: false });
+  const context = await browser.newContext();
   const page = await context.newPage();
 
-  await page.goto('https://www.linkedin.com/login');
+  await page.goto('https://www.linkedin.com/login', { waitUntil: 'domcontentloaded' });
 
-  console.log('Please log in manually');
+  console.log('Please log in manually in the opened browser window.');
 
-  await page.waitForURL('https://www.linkedin.com/feed/', {
+  await page.waitForURL(/linkedin\.com\/(feed|mynetwork|jobs)\/?/, {
     timeout: 0,
   });
 
-  console.log('Logged in successfully');
+  await context.storageState({ path: storageStatePath });
+  console.log(`Logged in successfully. Saved auth state to: ${storageStatePath}`);
 
-  await context.close();
+  await browser.close();
 })();

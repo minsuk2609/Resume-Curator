@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { parseResume } = require('../services/parser');
 const { scrapeJob } = require('../services/scraper');
-const { tailorResume } = require('../services/openai');
+const { tailorResumeAndGenerateQuestions } = require('../services/openai');
 const { generateDiff } = require('../services/diff');
 
 const router = express.Router();
@@ -41,9 +41,30 @@ router.post('/tailor', async (req, res) => {
   }
 
   try {
-    const tailored = await tailorResume(resumeText, jobDescription);
-    const diff = generateDiff(resumeText, tailored);
-    res.json({ original: resumeText, tailored, diff });
+    const {
+      tailoredResume,
+      behavioralQuestions,
+      technicalQuestions,
+      behavioralAnswers,
+      technicalAnswers,
+    } =
+      await tailorResumeAndGenerateQuestions(resumeText, jobDescription);
+    const diff = generateDiff(resumeText, tailoredResume);
+    res.json({
+      original: resumeText,
+      tailored: tailoredResume,
+      diff,
+      interviewQuestions: {
+        behavioral: behavioralQuestions.map((question, idx) => ({
+          question,
+          answer: behavioralAnswers[idx] || '',
+        })),
+        technical: technicalQuestions.map((question, idx) => ({
+          question,
+          answer: technicalAnswers[idx] || '',
+        })),
+      },
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

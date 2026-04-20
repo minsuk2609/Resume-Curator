@@ -1,8 +1,10 @@
 const { chromium } = require('playwright');
-const path = require('path');
+const {
+  getLinkedInStorageStatePath,
+  hasLinkedInStorageState,
+} = require('./linkedinAuth');
 
 const MAX_JOB_TEXT_LENGTH = 4000;
-const PROFILE_PATH = path.resolve(__dirname, '../../..', 'linkedin-profile');
 
 function extractJobId(url) {
   const match = url.match(/currentJobId=(\d+)|jobs\/view\/(\d+)/);
@@ -22,10 +24,15 @@ function cleanText(text) {
 }
 
 async function scrapeJob(url) {
-  const context = await chromium.launchPersistentContext(PROFILE_PATH, {
+  if (!hasLinkedInStorageState()) {
+    throw new Error('LinkedIn login required. Run `npm run login` in /server first.');
+  }
+
+  const storageStatePath = getLinkedInStorageStatePath();
+  const browser = await chromium.launch({
     headless: true,
   });
-
+  const context = await browser.newContext({ storageState: storageStatePath });
   const page = await context.newPage();
 
   try {
@@ -123,6 +130,7 @@ async function scrapeJob(url) {
     throw err;
   } finally {
     await context.close();
+    await browser.close();
   }
 }
 
