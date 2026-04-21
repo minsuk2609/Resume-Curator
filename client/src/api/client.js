@@ -18,3 +18,8 @@ export async function tailorResume(resumeText, jobDescription) {
   const { data } = await api.post('/tailor', { resumeText, jobDescription });
   return data;
 }
+
+export async function exportResumePdf(jsonResume) {
+  const response = await api.post('/export-pdf', { jsonResume }, { responseType: 'blob' });
+  return response.data;
+}

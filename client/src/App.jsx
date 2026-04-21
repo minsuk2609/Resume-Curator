@@ -91,7 +91,7 @@ export default function App() {
             </div>
 
             <div style={styles.tabContent}>
-              {activeTab === 'tailored' && <TailoredResume text={result.tailored} />}
+              {activeTab === 'tailored' && <TailoredResume jsonResume={result.jsonResume} />}
               {activeTab === 'diff' && (
                 <DiffView diff={result.diff} changeReasons={result.changeReasons} />
               )}
