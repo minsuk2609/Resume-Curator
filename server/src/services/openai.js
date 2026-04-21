@@ -2,7 +2,7 @@ const OpenAI = require('openai');
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const MAX_RESUME_LENGTH = 4000;
+const MAX_RESUME_LENGTH = 6000;
 const MAX_JOB_LENGTH = 10000;
 
 function parseJsonSafely(rawContent) {
@@ -25,6 +25,114 @@ function parseJsonSafely(rawContent) {
       return JSON.parse(withoutTrailingCommas);
     }
   }
+}
+
+function normalizeJsonResume(raw) {
+  const r = raw || {};
+  const b = r.basics || {};
+  return {
+    basics: {
+      name: b.name || '',
+      label: b.label || '',
+      email: b.email || '',
+      phone: b.phone || '',
+      url: b.url || '',
+      summary: b.summary || '',
+      location: {
+        address: b.location?.address || '',
+        city: b.location?.city || '',
+        region: b.location?.region || '',
+        countryCode: b.location?.countryCode || '',
+        postalCode: b.location?.postalCode || '',
+      },
+      profiles: Array.isArray(b.profiles)
+        ? b.profiles
+            .filter(p => p.url && p.url !== b.url)
+            .filter((p, i, arr) => arr.findIndex(q => q.url === p.url) === i)
+        : [],
+    },
+    work: Array.isArray(r.work) ? r.work : [],
+    education: Array.isArray(r.education)
+      ? r.education.map(e => {
+          const entry = { ...e };
+          if (!entry.score || /^(n\/a|none|null|-)$/i.test(String(entry.score).trim())) {
+            delete entry.score;
+          }
+          return entry;
+        })
+      : [],
+    skills: Array.isArray(r.skills) ? r.skills : [],
+    projects: Array.isArray(r.projects) ? r.projects : [],
+    awards: Array.isArray(r.awards) ? r.awards : [],
+    certificates: Array.isArray(r.certificates) ? r.certificates : [],
+    publications: Array.isArray(r.publications) ? r.publications : [],
+    volunteer: Array.isArray(r.volunteer) ? r.volunteer : [],
+    languages: Array.isArray(r.languages) ? r.languages : [],
+    interests: Array.isArray(r.interests) ? r.interests : [],
+    references: Array.isArray(r.references) ? r.references : [],
+    meta: {
+      version: 'v1.0.0',
+      lastModified: new Date().toISOString(),
+    },
+  };
+}
+
+function jsonResumeToText(resume) {
+  if (!resume) return '';
+  const parts = [];
+
+  const b = resume.basics || {};
+  if (b.name) parts.push(b.name);
+  if (b.label) parts.push(b.label);
+  const contact = [b.email, b.phone].filter(Boolean).join(' | ');
+  if (contact) parts.push(contact);
+  if (b.summary) parts.push('\nSUMMARY\n' + b.summary);
+
+  if (Array.isArray(resume.work) && resume.work.length) {
+    parts.push('\nEXPERIENCE');
+    for (const w of resume.work) {
+      const header = [w.position, w.name, [w.startDate, w.endDate].filter(Boolean).join(' – ')].filter(Boolean).join(' | ');
+      parts.push(header);
+      if (w.summary) parts.push(w.summary);
+      if (Array.isArray(w.highlights)) parts.push(...w.highlights.map(h => '• ' + h));
+    }
+  }
+
+  if (Array.isArray(resume.education) && resume.education.length) {
+    parts.push('\nEDUCATION');
+    for (const e of resume.education) {
+      const header = [e.studyType, e.area, e.institution, [e.startDate, e.endDate].filter(Boolean).join(' – ')].filter(Boolean).join(' | ');
+      parts.push(header);
+      if (e.score) parts.push('GPA: ' + e.score);
+      if (Array.isArray(e.courses) && e.courses.length) parts.push(e.courses.join(', '));
+    }
+  }
+
+  if (Array.isArray(resume.skills) && resume.skills.length) {
+    parts.push('\nSKILLS');
+    parts.push(resume.skills.map(s => s.name + (Array.isArray(s.keywords) && s.keywords.length ? ': ' + s.keywords.join(', ') : '')).join('\n'));
+  }
+
+  if (Array.isArray(resume.projects) && resume.projects.length) {
+    parts.push('\nPROJECTS');
+    for (const p of resume.projects) {
+      parts.push(p.name || '');
+      if (p.description) parts.push(p.description);
+      if (Array.isArray(p.highlights)) parts.push(...p.highlights.map(h => '• ' + h));
+    }
+  }
+
+  if (Array.isArray(resume.awards) && resume.awards.length) {
+    parts.push('\nAWARDS');
+    parts.push(resume.awards.map(a => [a.title, a.awarder].filter(Boolean).join(', ')).join('\n'));
+  }
+
+  if (Array.isArray(resume.certificates) && resume.certificates.length) {
+    parts.push('\nCERTIFICATES');
+    parts.push(resume.certificates.map(c => [c.name, c.issuer].filter(Boolean).join(', ')).join('\n'));
+  }
+
+  return parts.join('\n');
 }
 
 async function tailorResumeAndGenerateQuestions(resumeText, jobDescription) {
@@ -50,7 +158,7 @@ async function tailorResumeAndGenerateQuestions(resumeText, jobDescription) {
         {
           role: 'user',
           content: `Use the job description and resume to create:
-1) A tailored resume.
+1) A tailored resume in JSON Resume format (jsonresume.org schema v1).
 2) Behavioral interview questions and concise high-quality sample answers.
 3) Technical interview questions and concise high-quality sample answers.
 4) A short list of likely skills/experience areas this job posting is looking for.
@@ -58,12 +166,59 @@ async function tailorResumeAndGenerateQuestions(resumeText, jobDescription) {
 
 Return this JSON shape exactly:
 {
-  "tailoredResume": "string",
+  "jsonResume": {
+    "basics": {
+      "name": "string",
+      "label": "string (professional title/role)",
+      "email": "string",
+      "phone": "string",
+      "url": "string",
+      "summary": "string (2-4 sentence tailored professional summary)",
+      "location": { "city": "string", "region": "string", "countryCode": "string" },
+      "profiles": [{ "network": "string", "username": "string", "url": "string" }] (only include profiles explicitly present in the resume - do not fabricate GitHub, LinkedIn, or any other profile links)
+    },
+    "work": [{
+      "name": "string (company name)",
+      "position": "string (job title)",
+      "url": "string",
+      "startDate": "YYYY-MM",
+      "endDate": "YYYY-MM or omit if current",
+      "summary": "string (optional brief role description)",
+      "highlights": ["string (bullet point - tailor to match job description keywords)"]
+    }],
+    "education": [{
+      "institution": "string",
+      "area": "string (field of study)",
+      "studyType": "string (Bachelor, Master, PhD, etc.)",
+      "startDate": "YYYY-MM",
+      "endDate": "YYYY-MM",
+      "score": "string (GPA only if explicitly stated in resume - omit this field entirely if not present)",
+      "courses": ["string (relevant courses if listed)"]
+    }],
+    "skills": [{ "name": "string (skill category)", "level": "string", "keywords": ["string"] }],
+    "projects": [{
+      "name": "string",
+      "description": "string",
+      "highlights": ["string"],
+      "keywords": ["string"],
+      "startDate": "YYYY-MM",
+      "endDate": "YYYY-MM",
+      "url": "string"
+    }],
+    "awards": [{ "title": "string", "date": "YYYY-MM", "awarder": "string", "summary": "string" }],
+    "certificates": [{ "name": "string", "date": "YYYY-MM", "issuer": "string", "url": "string" }],
+    "volunteer": [{
+      "organization": "string", "position": "string",
+      "startDate": "YYYY-MM", "endDate": "YYYY-MM",
+      "summary": "string", "highlights": ["string"]
+    }],
+    "languages": [{ "language": "string", "fluency": "string" }]
+  },
   "changeReasons": [
     {
-      "originalText": "string",
-      "updatedText": "string",
-      "reason": "string"
+      "originalText": "string (short exact snippet from original resume)",
+      "updatedText": "string (short updated snippet)",
+      "reason": "string (why this change improves fit)"
     }
   ],
   "behavioralQuestions": ["string", "..."],
@@ -75,29 +230,23 @@ Return this JSON shape exactly:
 }
 
 Requirements:
-- Tailored resume should keep core facts truthful.
+- Extract ALL information from the resume into the correct JSON Resume fields.
+- Tailor work highlights and summary to match job description keywords and requirements.
+- Keep all facts truthful - do not invent experience, skills, or achievements.
+- Use YYYY-MM date format; omit fields that are not in the resume.
 - Generate 5-8 behavioral questions tied to role responsibilities and resume experiences.
 - Generate 5-8 technical questions tied to job requirements and candidate background.
-- Provide one answer for each question in the same order.
-- Keep each answer to 2-4 sentences with concrete details from the resume/job description.
-- Questions should be clear, specific, and interview-ready.
+- Provide one answer per question in the same order (2-4 sentences each, concrete details).
 - Generate 5-8 concise bullets for skillsExperienceLookFors based on role expectations.
-- Generate 4-6 concise bullets for projectIdeas tailored to this role and candidate context.
-- Keep look-fors and project ideas specific, realistic, and action-oriented.
-- Include 5-12 itemized changeReasons entries, each tied to a specific resume edit.
-- For each changeReasons entry, keep originalText and updatedText short exact snippets from the resume.
-- reason must explain why that exact change improves fit for the job description.
+- Generate 4-6 concise bullets for projectIdeas tailored to this role and candidate.
+- Include 5-12 itemized changeReasons, each tied to a specific resume edit.
+- reason must explain why that change improves fit for the job description.
 
 STRICT RULES:
-- DO NOT add new sections (no Summary, Additional Information, etc.)
-- DO NOT change section titles
-- DO NOT invent experience, skills, or achievements
-- ONLY rewrite existing bullet points to better match the job description
-- ONLY inject relevant keywords from the job description into existing content
-- KEEP the exact same structure and order
-- KEEP formatting simple plain text
-- DO NOT add explanations or commentary
-- DO NOT simplify project and experience too much
+- DO NOT invent experience, skills, or achievements not present in the resume.
+- ONLY rewrite existing bullet points to better match the job description.
+- ONLY inject relevant keywords into existing content.
+- DO NOT add commentary or explanations outside the JSON structure.
 
 JOB DESCRIPTION:
 ${trimmedJob}
@@ -107,7 +256,7 @@ ${trimmedResume}`,
         },
       ],
       temperature: 0.4,
-      max_tokens: 3200,
+      max_tokens: 6000,
     });
 
     console.log('OpenAI response received');
@@ -121,7 +270,12 @@ ${trimmedResume}`,
     const content = response.choices?.[0]?.message?.content?.trim();
     const parsed = parseJsonSafely(content || '{}');
 
-    const tailoredResume = (parsed.tailoredResume || '').trim();
+    const jsonResume = normalizeJsonResume(parsed.jsonResume);
+
+    if (!jsonResume.basics.name && !jsonResume.work.length && !jsonResume.education.length) {
+      throw new Error('Model did not return a valid JSON Resume.');
+    }
+
     const changeReasons = Array.isArray(parsed.changeReasons)
       ? parsed.changeReasons
           .map((item) => ({
@@ -150,21 +304,15 @@ ${trimmedResume}`,
       ? parsed.projectIdeas.filter(Boolean)
       : [];
 
-    if (!tailoredResume) {
-      throw new Error('Model did not return a tailored resume.');
-    }
-
-    console.log('Tailored length:', tailoredResume.length);
+    console.log('JSON Resume basics.name:', jsonResume.basics.name);
+    console.log('Work entries:', jsonResume.work.length);
+    console.log('Education entries:', jsonResume.education.length);
     console.log('Change reasons:', changeReasons.length);
     console.log('Behavioral questions:', behavioralQuestions.length);
     console.log('Technical questions:', technicalQuestions.length);
-    console.log('Behavioral answers:', behavioralAnswers.length);
-    console.log('Technical answers:', technicalAnswers.length);
-    console.log('Skills/experience look-fors:', skillsExperienceLookFors.length);
-    console.log('Project ideas:', projectIdeas.length);
 
     return {
-      tailoredResume,
+      jsonResume,
       changeReasons,
       behavioralQuestions,
       technicalQuestions,
@@ -179,4 +327,4 @@ ${trimmedResume}`,
   }
 }
 
-module.exports = { tailorResumeAndGenerateQuestions };
+module.exports = { tailorResumeAndGenerateQuestions, jsonResumeToText };
